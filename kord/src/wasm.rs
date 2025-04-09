@@ -57,7 +57,7 @@ impl KordNote {
     /// Returns [`Note`]s from audio data.
     #[cfg(feature = "analyze_base")]
     #[wasm_bindgen(js_name = fromAudio)]
-    pub fn from_audio(data: &[f32], length_in_seconds: u8) -> JsRes<Array> {
+    pub fn from_audio(data: &[f32], length_in_seconds: f32) -> JsRes<Array> {
         let notes = Note::try_from_audio(data, length_in_seconds).to_js_error()?.into_iter().map(KordNote::from);
 
         Ok(notes.into_js_array())
@@ -66,7 +66,7 @@ impl KordNote {
     /// Returns [`Note`]s from audio data using the ML inference algorithm.
     #[cfg(all(feature = "ml_infer", feature = "analyze_base"))]
     #[wasm_bindgen(js_name = fromAudioMl)]
-    pub fn from_audio_ml(data: &[f32], length_in_seconds: u8) -> JsRes<Array> {
+    pub fn from_audio_ml(data: &[f32], length_in_seconds: f32) -> JsRes<Array> {
         let notes = Note::try_from_audio_ml(data, length_in_seconds).to_js_error()?.into_iter().map(KordNote::from);
 
         Ok(notes.into_js_array())

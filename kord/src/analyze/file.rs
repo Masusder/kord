@@ -22,7 +22,7 @@ pub fn get_notes_from_audio_file(file: impl AsRef<Path>, start: Option<Duration>
 }
 
 /// Gets the audio data from a file.
-pub fn get_audio_data_from_file(file: impl AsRef<Path>, start: Option<Duration>, end: Option<Duration>) -> Res<(Vec<f32>, u8)> {
+pub fn get_audio_data_from_file(file: impl AsRef<Path>, start: Option<Duration>, end: Option<Duration>) -> Res<(Vec<f32>, f32)> {
     let path = file.as_ref();
     let start = start.unwrap_or_default();
 
@@ -34,10 +34,10 @@ pub fn get_audio_data_from_file(file: impl AsRef<Path>, start: Option<Duration>,
 
     let num_samples = samples.len();
 
-    let length_in_seconds = ((num_samples as f32) / (sample_rate as f32 * num_channels as f32)) as u8;
+    let length_in_seconds = (num_samples as f32) / (sample_rate as f32 * num_channels as f32);
 
     // Cut the samples to the nearest second.
-    let data = samples[..(length_in_seconds as f32 * sample_rate as f32 * num_channels as f32) as usize].to_vec();
+    let data = samples[..(length_in_seconds * sample_rate as f32 * num_channels as f32) as usize].to_vec();
 
     Ok((data, length_in_seconds))
 }

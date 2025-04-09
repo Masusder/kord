@@ -196,7 +196,7 @@ impl Note {
     /// Currently, this does not work with WASM.
     #[coverage(off)]
     #[cfg(feature = "analyze_mic")]
-    pub async fn try_from_mic(length_in_seconds: u8) -> Res<Vec<Note>> {
+    pub async fn try_from_mic(length_in_seconds: f32) -> Res<Vec<Note>> {
         use crate::analyze::mic::get_notes_from_microphone;
 
         get_notes_from_microphone(length_in_seconds).await
@@ -204,7 +204,7 @@ impl Note {
 
     /// Attempts to use the provided to identify the notes in the audio data.
     #[cfg(feature = "analyze_base")]
-    pub fn try_from_audio(data: &[f32], length_in_seconds: u8) -> Res<Vec<Note>> {
+    pub fn try_from_audio(data: &[f32], length_in_seconds: f32) -> Res<Vec<Note>> {
         use crate::analyze::base::get_notes_from_audio_data;
 
         get_notes_from_audio_data(data, length_in_seconds)
@@ -216,7 +216,7 @@ impl Note {
     /// Currently, this does not work with WASM.
     #[coverage(off)]
     #[cfg(all(feature = "ml_infer", feature = "analyze_mic"))]
-    pub async fn try_from_mic_ml(length_in_seconds: u8) -> Res<Vec<Self>> {
+    pub async fn try_from_mic_ml(length_in_seconds: f32) -> Res<Vec<Self>> {
         use crate::{analyze::mic::get_audio_data_from_microphone, ml::infer::infer};
 
         let audio_data = get_audio_data_from_microphone(length_in_seconds).await?;
@@ -226,7 +226,7 @@ impl Note {
 
     /// Attempts to use the provided to identify the notes in the audio data using ML.
     #[cfg(all(feature = "ml_infer", feature = "analyze_base"))]
-    pub fn try_from_audio_ml(data: &[f32], length_in_seconds: u8) -> Res<Vec<Self>> {
+    pub fn try_from_audio_ml(data: &[f32], length_in_seconds: f32) -> Res<Vec<Self>> {
         use crate::ml::infer::infer;
 
         infer(data, length_in_seconds)
@@ -418,12 +418,12 @@ impl Add<Interval> for Note {
     fn add(self, rhs: Interval) -> Self::Output {
         let new_pitch = self.named_pitch() + rhs.enharmonic_distance();
 
-        // Compute whether or not we "crossed" an octave.
+        // Compute whether we "crossed" an octave.
         let wrapping_octave = if new_pitch.pitch() < self.pitch() { Octave::One } else { Octave::Zero };
 
         // There is a "special wrap" for `Cb`, and `Dbbb`, since they don't technically loop; and, for B#, etc., on the other side.
-        // Basically, if we were already "on" the weird one (this is a perfect unision, or perfect octave, etc.), then we don't
-        // do anything special.  Otherwise, if we landed on on of these edge cases, then we need to adjust the octave.
+        // Basically, if we were already "on" the weird one (this is a perfect unison, or perfect octave, etc.), then we don't
+        // do anything special.  Otherwise, if we landed on of these edge cases, then we need to adjust the octave.
         let mut special_octave = 0;
 
         if self.named_pitch != new_pitch {
@@ -442,7 +442,7 @@ impl Add<Interval> for Note {
             }
         }
 
-        // Get whether or not the interval itself contains an octave.
+        // Get whether the interval itself contains an octave.
         let interval_octave = rhs.octave();
 
         Note {
@@ -459,12 +459,12 @@ impl Sub<Interval> for Note {
     fn sub(self, rhs: Interval) -> Self::Output {
         let new_pitch = self.named_pitch() - rhs.enharmonic_distance();
 
-        // Compute whether or not we "crossed" an octave.
+        // Compute whether we "crossed" an octave.
         let wrapping_octave = if new_pitch.pitch() > self.pitch() { Octave::One } else { Octave::Zero };
 
         // There is a "special wrap" for `Cb`, and `Dbbb`, since they don't technically loop; and, for B#, etc., on the other side.
-        // Basically, if we were already "on" the weird one (this is a perfect unision, or perfect octave, etc.), then we don't
-        // do anything special.  Otherwise, if we landed on on of these edge cases, then we need to adjust the octave.
+        // Basically, if we were already "on" the weird one (this is a perfect unison, or perfect octave, etc.), then we don't
+        // do anything special.  Otherwise, if we landed on one of these edge cases, then we need to adjust the octave.
         let mut special_octave = 0;
 
         if self.named_pitch != new_pitch {
@@ -483,7 +483,7 @@ impl Sub<Interval> for Note {
             }
         }
 
-        // Get whether or not the interval itself contains an octave.
+        // Get whether the interval itself contains an octave.
         let interval_octave = rhs.octave();
 
         Note {

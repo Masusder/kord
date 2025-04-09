@@ -1,6 +1,6 @@
 [package]
 name = "kord"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2021"
 authors = ["Aaron Roney <twitchax@gmail.com>"]
 license = "MIT"
@@ -34,7 +34,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(wasm)', 'cfg(host_family_u
 [features]
 default = ["cli", "analyze", "audio", "ml_infer"]
 
-cli = ["clap", "futures"]
+cli = ["clap", "futures", "rand"]
 
 audio = ["rodio"]
 

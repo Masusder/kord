@@ -102,14 +102,14 @@ enum AnalyzeCommand {
     #[cfg(feature = "analyze_mic")]
     Mic {
         /// Sets the duration of listening time (in seconds).
-        #[arg(short, long, default_value_t = 10)]
-        length: u8,
+        #[arg(short, long, default_value_t = 10.0)]
+        length: f32,
     },
 
     /// Guess pitches and chords from the specified section of an audio file.
     #[cfg(feature = "analyze_file")]
     File {
-        /// Whether or not to play a preview of the selected section of the
+        /// Whether to play a preview of the selected section of the
         /// audio file before analyzing.
         #[arg(long = "no-preview", action=ArgAction::SetFalse, default_value_t = true)]
         preview: bool,
@@ -137,8 +137,8 @@ enum MlCommand {
         destination: String,
 
         /// Sets the duration of listening time (in seconds).
-        #[arg(short, long, default_value_t = 10)]
-        length: u8,
+        #[arg(short, long, default_value_t = 10.0)]
+        length: f32,
     },
 
     /// Runs the ML trainer using burn-rs, tch-rs, and CUDA as defaults.
@@ -282,14 +282,14 @@ enum InferCommand {
     #[cfg(feature = "analyze_mic")]
     Mic {
         /// Sets the duration of listening time (in seconds).
-        #[arg(short, long, default_value_t = 10)]
-        length: u8,
+        #[arg(short, long, default_value_t = 10.0)]
+        length: f32,
     },
 
     /// Guess pitches and chords from the specified section of an audio file.
     #[cfg(feature = "analyze_file")]
     File {
-        /// Whether or not to play a preview of the selected section of the
+        /// Whether to play a preview of the selected section of the
         /// audio file before analyzing.
         #[arg(long = "no-preview", action=ArgAction::SetFalse, default_value_t = true)]
         preview: bool,

@@ -12,11 +12,12 @@ use rustfft::{
 use crate::core::note::{HasPrimaryHarmonicSeries, ALL_PITCH_NOTES_WITH_FREQUENCY};
 
 use crate::core::{base::Res, note::Note, pitch::HasFrequency};
+// use crate::helpers::plot_frequency_space;
 
 /// Gets notes from audio data.
-pub fn get_notes_from_audio_data(data: &[f32], length_in_seconds: u8) -> Res<Vec<Note>> {
-    if length_in_seconds < 1 {
-        return Err(anyhow::Error::msg("Listening length in seconds must be greater than 1."));
+pub fn get_notes_from_audio_data(data: &[f32], length_in_seconds: f32) -> Res<Vec<Note>> {
+    if length_in_seconds < 0.2 {
+        return Err(anyhow::Error::msg("Listening length in seconds must be greater than 0.2."));
     }
 
     let num_nan = data.iter().filter(|n| n.is_nan()).count();
@@ -39,7 +40,7 @@ pub fn get_notes_from_smoothed_frequency_space(smoothed_frequency_space: &[(f32,
     // Translate the frequency space into a "peak space" (dampen values that are not the "peak" of a specified window).
 
     let peak_space = translate_frequency_space_to_peak_space(smoothed_frequency_space);
-    //plot_frequency_space(&peak_space, "peak_space", 100f32, 1000f32);
+    // plot_frequency_space(&peak_space, "peak_space", "test", 0f32, 1000f32);
 
     // Bucket top N bins into their proper notes, and keep "magnitude".
 
@@ -56,7 +57,7 @@ pub fn get_notes_from_smoothed_frequency_space(smoothed_frequency_space: &[(f32,
 }
 
 /// Gets the frequency space from the audio data.
-pub fn get_frequency_space(data: &[f32], length_in_seconds: u8) -> Vec<(f32, f32)> {
+pub fn get_frequency_space(data: &[f32], length_in_seconds: f32) -> Vec<(f32, f32)> {
     let num_samples = data.len();
 
     // Perform the FFT.
@@ -67,7 +68,7 @@ pub fn get_frequency_space(data: &[f32], length_in_seconds: u8) -> Vec<(f32, f32
     let mut buffer = data.iter().map(|n| Complex::new(*n, 0.0)).collect::<Vec<_>>();
     fft.process(&mut buffer);
 
-    buffer.into_iter().enumerate().map(|(k, d)| (k as f32 / length_in_seconds as f32, d.abs())).collect::<Vec<_>>()
+    buffer.into_iter().enumerate().map(|(k, d)| (k as f32 / length_in_seconds, d.abs())).collect::<Vec<_>>()
 }
 
 /// Gets the time space from the frequency space.
@@ -107,16 +108,16 @@ pub fn compute_cqt(frequency_space: &[f32]) -> Vec<f32> {
         let start_bin = (freq_center - freq_bw / 2.0) / fft_freq_step;
         let end_bin = (freq_center + freq_bw / 2.0) / fft_freq_step;
 
-        let mut cqt_bin = vec![rustfft::num_complex::Complex::new(0.0, 0.0); frequency_space.len()];
+        let mut cqt_bin = vec![Complex::new(0.0, 0.0); frequency_space.len()];
 
         for j in start_bin as usize..=end_bin as usize {
             let weight = (j as f32 - freq_center / fft_freq_step) / freq_bw;
             let weight = weight * std::f32::consts::PI * 2.0;
             let fft_bin = frequency_space[j];
-            cqt_bin[j] = rustfft::num_complex::Complex::new(fft_bin * weight.sin(), 0.0);
+            cqt_bin[j] = Complex::new(fft_bin * weight.sin(), 0.0);
         }
 
-        let ifft = rustfft::FftPlanner::<f32>::new().plan_fft_inverse(cqt_bin.len());
+        let ifft = FftPlanner::<f32>::new().plan_fft_inverse(cqt_bin.len());
         ifft.process(&mut cqt_bin);
 
         for j in 0..frequency_space.len() {
@@ -136,16 +137,21 @@ pub fn compute_cqt(frequency_space: &[f32]) -> Vec<f32> {
     result
 }
 
-/// Calculates the "smoothed" frequency space by normalizing to 1.0 seconds of playback.
-pub fn get_smoothed_frequency_space(frequency_space: &[(f32, f32)], length_in_seconds: u8) -> Vec<(f32, f32)> {
+/// Calculates a smoothed frequency spectrum using adaptive window sizing based on frequency resolution
+pub fn get_smoothed_frequency_space(frequency_space: &[(f32, f32)], length_in_seconds: f32) -> Vec<(f32, f32)> {
     let mut smoothed_frequency_space = Vec::new();
-    let size = length_in_seconds as usize;
 
-    for k in (0..frequency_space.len()).step_by(size) {
-        let average_frequency = frequency_space[k..k + size].iter().map(|(f, _)| f).sum::<f32>() / size as f32;
-        let average_magnitude = frequency_space[k..k + size].iter().map(|(_, m)| m).sum::<f32>() / size as f32;
+    if frequency_space.is_empty() || length_in_seconds <= 0.0 {
+        return smoothed_frequency_space;
+    }
 
-        smoothed_frequency_space.push((average_frequency, average_magnitude));
+    let window_size = (length_in_seconds.max(0.001).min(10_000.0).ceil() as usize).max(1).min(frequency_space.len());
+
+    for chunk in frequency_space.chunks(window_size) {
+        let count = chunk.len() as f32;
+        let (sum_freq, sum_mag) = chunk.iter().fold((0.0, 0.0), |(sf, sm), &(f, m)| (sf + f, sm + m));
+
+        smoothed_frequency_space.push((sum_freq / count, sum_mag / count));
     }
 
     smoothed_frequency_space
@@ -153,13 +159,13 @@ pub fn get_smoothed_frequency_space(frequency_space: &[(f32, f32)], length_in_se
 
 /// Translate the frequency space into a "peak space".
 ///
-/// Returns a vector of (frequency, magnitude) pair peaks sorted from largest magnitude to smallest.
+/// Returns a vector of (frequency, magnitude) pair peaks sorted from the largest magnitude to smallest.
 pub fn translate_frequency_space_to_peak_space(frequency_space: &[(f32, f32)]) -> Vec<(f32, f32)> {
     // Dividing the frequency by 32.5 yields roughly 1/3 the distance between a note and the note one semitone away, which is the window size we want
-    let magic_window_number = 50f32;
+    let magic_window_number = 15f32;
 
-    // Compute proper start and end indexes.  // Only need to find peaks within the limits of a piano / singing.
-    let min_index = 50;
+    // Compute proper start and end indexes.  // Only need to find peaks within the limits of a piano / singing / guitar.
+    let min_index = 15;
     let max_index = 8_000;
 
     let mut peak_space = frequency_space.to_vec();
@@ -169,7 +175,7 @@ pub fn translate_frequency_space_to_peak_space(frequency_space: &[(f32, f32)]) -
     let mut last_k = min_index;
     let mut k = min_index;
     while k < max_index {
-        let window_size = (frequency_space[k].0 / magic_window_number) as usize;
+        let window_size = ((frequency_space[k].0 / magic_window_number) as usize).min(frequency_space.len() - k);
 
         let max_in_window = (k..k + window_size).map(|i| frequency_space[i].1).max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap_or_default();
 
@@ -281,7 +287,7 @@ fn reduce_notes_by_harmonic_series(notes: &[(Note, f32)], cutoff: f32) -> Vec<No
     working_set.into_iter().map(|(note, _)| note).collect()
 }
 
-/// For every note, get its "frequency window", which is halfway between the frequency of the note and the frequency of the
+/// For every note, get its "frequency window", which is halfway between the frequency of the note and the frequency of
 /// the one before, and the next one.
 ///
 /// Returns a vector of tuples, where the first element is the note, and the second element is the frequency window as a (low, high) tuple.
@@ -308,7 +314,7 @@ pub fn get_frequency_bins(notes: &[Note]) -> Vec<(Note, (f32, f32))> {
     bins
 }
 
-/// Perform a binary search of an array to find the the element that is closest to the target as defined by a closure.
+/// Perform a binary search of an array to find the element that is closest to the target as defined by a closure.
 ///
 /// The array must be sorted in ascending order.
 pub fn binary_search_closest<T, F>(array: &[T], target: f32, mut get_value: F) -> Option<&T>
@@ -363,7 +369,7 @@ pub(crate) mod tests {
     pub fn load_test_data() -> Vec<f32> {
         let mut file = File::open("tests/vec.bin").unwrap();
         let file_size = file.metadata().unwrap().len() as usize;
-        let float_size = std::mem::size_of::<f32>();
+        let float_size = size_of::<f32>();
         let element_count = file_size / float_size;
         let mut buffer = vec![0u8; file_size];
 
@@ -379,20 +385,20 @@ pub(crate) mod tests {
     #[test]
     #[should_panic]
     fn test_get_notes_from_audio_data_length() {
-        get_notes_from_audio_data(&[0.0, 0.0, 0.0], 0).unwrap();
+        get_notes_from_audio_data(&[0.0, 0.0, 0.0], 0.0).unwrap();
     }
 
     #[test]
     #[should_panic]
     fn test_get_notes_from_audio_data_nan() {
-        get_notes_from_audio_data(&[0.0, 0.0, f32::NAN], 10).unwrap();
+        get_notes_from_audio_data(&[0.0, 0.0, f32::NAN], 10.0).unwrap();
     }
 
     #[test]
     fn test_get_time_space() {
         let data = load_test_data();
 
-        let frequency_space = get_frequency_space(&data, 5).into_iter().map(|(_, v)| v).collect::<Vec<_>>();
+        let frequency_space = get_frequency_space(&data, 5.0).into_iter().map(|(_, v)| v).collect::<Vec<_>>();
         let _ = get_time_space(&frequency_space);
     }
 

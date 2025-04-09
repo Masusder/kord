@@ -55,7 +55,7 @@ where
 }
 
 /// Infer notes from the audio data.
-pub fn infer(audio_data: &[f32], length_in_seconds: u8) -> Res<Vec<Note>> {
+pub fn infer(audio_data: &[f32], length_in_seconds: f32) -> Res<Vec<Note>> {
     let frequency_space = get_frequency_space(audio_data, length_in_seconds);
     let smoothed_frequency_space: [_; FREQUENCY_SPACE_SIZE] = get_smoothed_frequency_space(&frequency_space, length_in_seconds)
         .into_iter()
@@ -115,7 +115,7 @@ mod tests {
         // Convert the buffer to a vector of f32
         let audio_data: Vec<f32> = unsafe { std::slice::from_raw_parts(buffer.as_ptr() as *const f32, element_count).to_vec() };
 
-        let notes = infer(&audio_data, 5).unwrap();
+        let notes = infer(&audio_data, 5.0).unwrap();
 
         let chord = Chord::try_from_notes(&notes).unwrap();
 
