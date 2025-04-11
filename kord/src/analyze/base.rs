@@ -32,14 +32,14 @@ pub fn get_notes_from_audio_data(data: &[f32], length_in_seconds: f32) -> Res<Ve
     let smoothed_frequency_space = get_smoothed_frequency_space(&frequency_space, length_in_seconds);
     //plot_frequency_space(&smoothed_frequency_space, "frequency_space", 100f32, 1000f32);
 
-    Ok(get_notes_from_smoothed_frequency_space(&smoothed_frequency_space))
+    Ok(get_notes_from_smoothed_frequency_space(&smoothed_frequency_space, length_in_seconds))
 }
 
 /// Gets notes from pre-smoothed frequency data (helps with model training deterministic features).
-pub fn get_notes_from_smoothed_frequency_space(smoothed_frequency_space: &[(f32, f32)]) -> Vec<Note> {
+pub fn get_notes_from_smoothed_frequency_space(smoothed_frequency_space: &[(f32, f32)], length_in_seconds: f32) -> Vec<Note> {
     // Translate the frequency space into a "peak space" (dampen values that are not the "peak" of a specified window).
 
-    let peak_space = translate_frequency_space_to_peak_space(smoothed_frequency_space);
+    let peak_space = translate_frequency_space_to_peak_space(smoothed_frequency_space, length_in_seconds);
     // plot_frequency_space(&peak_space, "peak_space", "test", 0f32, 1000f32);
 
     // Bucket top N bins into their proper notes, and keep "magnitude".
@@ -145,7 +145,7 @@ pub fn get_smoothed_frequency_space(frequency_space: &[(f32, f32)], length_in_se
         return smoothed_frequency_space;
     }
 
-    let window_size = (length_in_seconds.max(0.001).min(10_000.0).ceil() as usize).max(1).min(frequency_space.len());
+    let window_size = (length_in_seconds.max(0.001).min(8_000.0).ceil() as usize).max(1).min(frequency_space.len());
 
     for chunk in frequency_space.chunks(window_size) {
         let count = chunk.len() as f32;
@@ -160,12 +160,22 @@ pub fn get_smoothed_frequency_space(frequency_space: &[(f32, f32)], length_in_se
 /// Translate the frequency space into a "peak space".
 ///
 /// Returns a vector of (frequency, magnitude) pair peaks sorted from the largest magnitude to smallest.
-pub fn translate_frequency_space_to_peak_space(frequency_space: &[(f32, f32)]) -> Vec<(f32, f32)> {
+pub fn translate_frequency_space_to_peak_space(frequency_space: &[(f32, f32)], length_in_seconds: f32) -> Vec<(f32, f32)> {
+    let is_realtime = length_in_seconds < 1.0;
     // Dividing the frequency by 32.5 yields roughly 1/3 the distance between a note and the note one semitone away, which is the window size we want
-    let magic_window_number = 15f32;
+    // It's important to note that window size shifts when trying to recognize notes from smaller audio chunks, resulting in lower octaves to be cut off from peak space if not accounted for.
+    let magic_window_number = if is_realtime {
+        15f32
+    } else {
+        50f32
+    };
 
     // Compute proper start and end indexes.  // Only need to find peaks within the limits of a piano / singing / guitar.
-    let min_index = 15;
+    let min_index = if is_realtime {
+        15
+    } else {
+        50
+    };
     let max_index = 8_000;
 
     let mut peak_space = frequency_space.to_vec();

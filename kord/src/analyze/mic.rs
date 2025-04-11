@@ -119,15 +119,11 @@ mod tests {
         core::{base::Parsable, chord::Chord, note::Note},
     };
 
-    static DURATION: f32 = 0.2;
+    static REALTIME_DURATION: f32 = 0.2;
     static VALID_NOTES_GUITAR: LazyLock<Vec<Note>> = LazyLock::new(|| {
         ALL_PITCH_NOTES
             .iter()
             .copied()
-            .filter(|note| {
-                let name = note.name();
-                !name.contains("###") && !name.contains("bbb") && !name.contains("##") && !name.contains("bb")
-            })
             .filter(|note| (80.0..=8_000.0).contains(&note.frequency()))
             .collect()
     });
@@ -157,31 +153,31 @@ mod tests {
     }
 
     #[test]
-    fn test_single_note() {
+    fn test_single_note_realtime() {
         let mut rng = thread_rng();
 
         let selected_note = *VALID_NOTES_GUITAR.choose(&mut rng).unwrap();
         let frequency = selected_note.frequency();
 
-        let data = generate_test_tone(DURATION, &[frequency]);
+        let data = generate_test_tone(REALTIME_DURATION, &[frequency]);
 
-        let notes = Note::try_from_audio(&data, DURATION).unwrap();
+        let notes = Note::try_from_audio(&data, REALTIME_DURATION).unwrap();
 
         assert_eq!(notes.len(), 1, "Expected exactly one note (got {})", notes.len());
         assert_eq!(notes[0], selected_note, "Detected note '{}' doesn't match expected '{}'", notes[0].name(), selected_note.name());
     }
 
     #[test]
-    fn test_multiple_notes() {
+    fn test_multiple_notes_realtime() {
         let mut rng = thread_rng();
 
         let selected_notes = VALID_NOTES_GUITAR.choose_multiple(&mut rng, 3).copied().collect::<Vec<_>>();
 
         let frequencies: Vec<f32> = selected_notes.iter().map(|n| n.frequency()).collect();
 
-        let data = generate_test_tone(DURATION, &frequencies);
+        let data = generate_test_tone(REALTIME_DURATION, &frequencies);
 
-        let detected_notes = Note::try_from_audio(&data, DURATION).unwrap();
+        let detected_notes = Note::try_from_audio(&data, REALTIME_DURATION).unwrap();
 
         let valid_count = detected_notes.iter().filter(|n| selected_notes.contains(n)).count();
 

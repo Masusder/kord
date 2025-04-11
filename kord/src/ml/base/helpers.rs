@@ -176,7 +176,7 @@ pub fn linspace(start: f32, end: f32, num_points: usize) -> Vec<f32> {
 pub fn get_deterministic_guess(kord_item: &KordItem) -> u128 {
     let smoothed_frequency_space = kord_item.frequency_space.into_iter().enumerate().map(|(k, v)| (k as f32, v)).collect::<Vec<_>>();
 
-    let notes = get_notes_from_smoothed_frequency_space(&smoothed_frequency_space);
+    let notes = get_notes_from_smoothed_frequency_space(&smoothed_frequency_space, 1.0);
 
     Note::id_mask(&notes)
 }
