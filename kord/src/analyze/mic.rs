@@ -108,10 +108,14 @@ async fn record_from_device(device: cpal::Device, config: cpal::SupportedStreamC
 
 #[cfg(test)]
 mod tests {
-    use rand::{seq::SliceRandom, thread_rng};
-    use std::f32::consts::PI;
-    use std::sync::LazyLock;
-
+    use std::{
+        f32::consts::PI,
+        sync::LazyLock
+    };
+    use rand::{
+        rng,
+        prelude::IndexedRandom
+    };
     use crate::{
         core::base::HasName,
         core::note::ALL_PITCH_NOTES,
@@ -154,12 +158,11 @@ mod tests {
 
     #[test]
     fn test_single_note_realtime() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
 
         let selected_note = *VALID_NOTES_GUITAR.choose(&mut rng).unwrap();
-        let frequency = selected_note.frequency();
 
-        let data = generate_test_tone(REALTIME_DURATION, &[frequency]);
+        let data = generate_test_tone(REALTIME_DURATION, &[selected_note.frequency()]);
 
         let notes = Note::try_from_audio(&data, REALTIME_DURATION).unwrap();
 
@@ -169,7 +172,7 @@ mod tests {
 
     #[test]
     fn test_multiple_notes_realtime() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
 
         let selected_notes = VALID_NOTES_GUITAR.choose_multiple(&mut rng, 3).copied().collect::<Vec<_>>();
 
